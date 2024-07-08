@@ -1,0 +1,107 @@
+x-common-settings: &common-settings
+  restart: unless-stopped
+  labels:
+    - "com.centurylinklabs.watchtower.enable=true"
+  networks:
+    - test
+  logging:
+    driver: "json-file"
+    options:
+      "max-size": "10m"
+      "max-file": "5"
+
+x-common-healthcheck: &common-healthcheck
+  interval: 30s
+  timeout: 10s
+  retries: 4
+  start_period: 30s
+
+networks:
+  test:
+    external: true
+    name: test
+
+volumes:
+  redis:
+  rabbitmq:
+  mysql:
+
+#######################################################################################
+
+services:
+  mysql:
+    <<: *common-settings
+    image: ${LOCAL_REGISTRY}container-registry.oracle.com/mysql/community-server:${TAG:-latest}
+    container_name: mysql
+    hostname: mysql
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ ! -d /var/lib/mysql/performance_schema ]; then
+          echo 'MySQL database not found, first run.'
+          sh -c "
+            while ! mysqladmin ping -uroot -p$$MYSQL_ROOT_PASSWORD >/dev/null 2>&1; do
+              sleep 2
+              echo 'Waiting for local MySQL to start...'
+            done
+            sleep 20
+            mysql -uroot -p$$MYSQL_ROOT_PASSWORD -e \"GRANT ALL privileges ON *.* TO '$$MYSQL_USER'@'%';\"
+            " &
+        fi
+        exec /entrypoint.sh mysqld --max-connections=4096
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - 3306:3306
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mysql:/var/lib/mysql
+      # - ../../db/:/var/lib/mysql/
+    healthcheck:
+      <<: *common-healthcheck
+      test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+
+#######################################################################################
+
+  rabbitmq:
+    <<: *common-settings
+    image: ${LOCAL_REGISTRY}rabbitmq:${TAG:-latest}
+    hostname: rabbitmq
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit log_levels [{connection,error},{default,error}] disk_free_limit 2147483648
+      - RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE_VALUE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - rabbitmq:/var/lib/rabbitmq
+    ports:
+      - 15672:15672
+      - 5672:5672
+    healthcheck:
+      <<: *common-healthcheck
+      test: rabbitmq-diagnostics -q ping
+
+#######################################################################################
+
+  redis:
+    <<: *common-settings
+    container_name: redis
+    image: ${LOCAL_REGISTRY}bitnami/redis:${TAG:-latest}
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes
+    ports:
+      - 6379:6379
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - redis:/data
+    healthcheck:
+      <<: *common-healthcheck
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]

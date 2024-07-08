@@ -1,0 +1,26 @@
+services:
+  autoheal:
+    image: ${LOCAL_REGISTRY}willfarrell/autoheal:${TAG:-latest}
+    restart: unless-stopped
+    container_name: autoheal
+    # labels:
+    #     - "autoheal=true"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: 
+      - test
+    environment:
+      - AUTOHEAL_INTERVAL=60
+      - AUTOHEAL_START_PERIOD=1200
+      - AUTOHEAL_DEFAULT_STOP_TIMEOUT=10
+      - CURL_TIMEOUT=30
+      - AUTOHEAL_CONTAINER_LABEL=all
+      # - AUTOHEAL_CONTAINER_LABEL=autoheal
+
+networks:
+  test:
+    external: true
+    name: test

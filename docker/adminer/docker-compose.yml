@@ -1,0 +1,27 @@
+services:
+  adminer:
+    image: ${LOCAL_REGISTRY}adminer:${TAG:-latest}
+    restart: unless-stopped
+    container_name: adminer
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - ADMINER_DEFAULT_SERVER=mysql
+    ports:
+      - 9991:8080
+    networks: 
+      - test
+    logging:
+      driver: "json-file"
+      options:
+        "max-size": "10m"
+        "max-file": "5"
+
+#######################################################################################
+
+networks:
+  test:
+    external: true
+    name: test

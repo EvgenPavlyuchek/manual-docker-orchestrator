@@ -1,0 +1,23 @@
+services:
+  dozzle:
+    container_name: dozzle
+    image: ${LOCAL_REGISTRY}amir20/dozzle:${TAG:-latest}
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - 8080:8080
+    logging:
+      driver: "json-file"
+      options:
+        "max-size": "10m"
+        "max-file": "5"
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+      start_period: 30s

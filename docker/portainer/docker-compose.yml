@@ -1,0 +1,25 @@
+services:
+  portainer:
+    image: ${LOCAL_REGISTRY}portainer/portainer-ce:${TAG:-latest}
+    container_name: portainer
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer:/data
+    ports:
+      - 8000:8000
+      - 9000:9000
+      - 9443:9443
+    logging:
+      driver: "json-file"
+      options:
+        "max-size": "10m"
+        "max-file": "5"
+
+#######################################################################################
+
+volumes:
+  portainer:
